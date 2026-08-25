@@ -75,7 +75,6 @@ export default async function handler(req, res) {
                     let binData = await getRes.json();
                     let currentUsers = (binData && binData.record && Array.isArray(binData.record.users)) ? binData.record.users : [];
 
-                    // Telegram mesajından bilgileri direkt satır satır okuyoruz
                     let incomingMsg = messageObj.text || "";
                     let lines = incomingMsg.split('\n');
                     
@@ -105,10 +104,7 @@ export default async function handler(req, res) {
                     await fetch(`https://api.telegram.org/bot${botToken}/answerCallbackQuery`, {
                         method: 'POST',
                         headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({ 
-                            callback_query_id: callbackQueryId, 
-                            text: "✅ Onaylandı! Tahta eklendi." 
-                        })
+                        body: JSON.stringify({ callback_query_id: callbackQueryId, text: "✅ Onaylandı!" })
                     });
 
                     if (messageObj) {
@@ -131,7 +127,7 @@ export default async function handler(req, res) {
                         await fetch(`https://api.telegram.org/bot${botToken}/answerCallbackQuery`, {
                             method: 'POST',
                             headers: { 'Content-Type': 'application/json' },
-                            body: JSON.stringify({ callback_query_id: callbackQueryId, text: "❌ Başvuru reddedildi." })
+                            body: JSON.stringify({ callback_query_id: callbackQueryId, text: "❌ Reddedildi." })
                         });
                         await fetch(`https://api.telegram.org/bot${botToken}/editMessageReplyMarkup`, {
                             method: 'POST',
@@ -153,26 +149,35 @@ export default async function handler(req, res) {
             const { name, nftImg, message, amount, txid } = req.body;
             const text = `👑 YENİ FLEX BAŞVURUSU!\n\n🐦 X Handle: ${name}\n🖼️ NFT Görsel: ${nftImg}\n💬 Mesaj: ${message}\n💰 Tutar: ${amount} USDT\n🔗 TxID: ${txid}`;
 
-            // Callback data artık sadece 6 karakter! Telegram'ın sınırı aşması imkansız, butonlar %100 garantili gelecektir.
-            const keyboard = {
-                inline_keyboard: [
-                    [
-                        { text: "✅ Onayla", callback_data: "cf_yes" },
-                        { text: "❌ Reddet", callback_data: "cf_no" }
+            const payload = {
+                chat_id: chatId,
+                text: text,
+                reply_markup: {
+                    inline_keyboard: [
+                        [
+                            { text: "✅ Onayla", callback_data: "cf_yes" },
+                            { text: "❌ Reddet", callback_data: "cf_no" }
+                        ]
                     ]
-                ]
+                }
             };
 
             try {
                 let response = await fetch(`https://api.telegram.org/bot${botToken}/sendMessage`, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ chat_id: chatId, text: text, reply_markup: keyboard })
+                    body: JSON.stringify(payload)
                 });
 
                 let data = await response.json();
-                return data.ok ? res.status(200).json({ success: true }) : res.status(400).json({ error: data.description });
+                console.log("Telegram API Yanıtı:", JSON.stringify(data)); // Vercel loglarında görebilmek için
+
+                if (!data.ok) {
+                    return res.status(400).json({ error: data.description });
+                }
+                return res.status(200).json({ success: true });
             } catch (err) {
+                console.error("Fetch Hatası:", err);
                 return res.status(500).json({ error: err.message });
             }
         }
