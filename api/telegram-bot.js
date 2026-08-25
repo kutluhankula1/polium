@@ -25,32 +25,22 @@ export default async function handler(req, res) {
             let data = await response.json();
             let rawUsers = (data.record && Array.isArray(data.record.users)) ? data.record.users : [];
 
-            // Spam temizliği ve ondalık formatı
-            let realUsers = rawUsers
-                .filter(u => {
-                    const n = (u.name || "").toLowerCase();
-                    return !n.includes("victor");
-                })
-                .map(u => ({
-                    ...u,
-                    amount: parseFloat(parseFloat(u.amount || 0).toFixed(2))
-                }));
+            // Gerçek kullanıcıları al (Artık victor filtresi yok, testlerin rahatça görünecek)
+            let realUsers = rawUsers.map(u => ({
+                ...u,
+                amount: parseFloat(parseFloat(u.amount || 0).toFixed(2))
+            }));
 
             let fullList = [...realUsers];
             let index = 0;
             
-            // Tamamen bağımsız ve rastgele dağılımlı örnek tutarlar üretimi
-            // Her eleman için tamamen rasyonel olmayan, birbirinden kopuk rastgele düşüşler ve küsuratlar kullanıyoruz
             let currentMockAmount = 492.35;
             while (fullList.length < 100) {
                 let template = baseTemplates[index % baseTemplates.length];
-                
-                // Tamamen rastgele aralıklarda düşüşler (bazen 1.20 dolar, bazen 14.50 dolar, bazen 3.75 dolar)
                 let randomJump = (Math.sin(index * 99) * 10 + 12) * (1 + (index % 3));
                 currentMockAmount = Math.max(10.50, currentMockAmount - randomJump);
 
-                // Tamamen bağımsız küsurat üretimi
-                let centsOptions = [0.12, 0.45, 0.78, 0.33, 0.90, 0.15, 0.67, 0.89, 0.24, 0.51];
+                let centsOptions = [0.00, 0.25, 0.50, 0.75, 0.33, 0.88, 0.45, 0.90, 0.00];
                 let baseInt = Math.floor(currentMockAmount);
                 let finalMockAmt = baseInt + centsOptions[(index * 7) % centsOptions.length];
 
@@ -62,7 +52,6 @@ export default async function handler(req, res) {
                 index++;
             }
 
-            // Büyükten küçüğe kusursuz sıralama (Örnekler ve gerçekler kendi aralarında doğru sıraya oturur)
             fullList.sort((a, b) => b.amount - a.amount);
 
             let formattedList = fullList.slice(0, 100).map(u => ({
@@ -96,7 +85,7 @@ export default async function handler(req, res) {
                     let binData = await getRes.json();
                     let currentUsers = (binData && binData.record && Array.isArray(binData.record.users)) ? binData.record.users : [];
 
-                    currentUsers = currentUsers.filter(u => !u.name || !u.name.toLowerCase().includes("victor"));
+                    // Yeni kullanıcıyı doğrudan ekle
                     currentUsers.push({ name, message: msgText, amount: amount });
 
                     await fetch(`https://api.jsonbin.io/v3/b/${BIN_ID}`, {
