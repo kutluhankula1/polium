@@ -22,11 +22,30 @@
     </header>
 
     <!-- Ana İçerik Alanı -->
-    <main class="max-w-4xl mx-auto p-6">
-        <section class="text-center py-10">
-            <h2 class="text-4xl font-bold mb-4">Make Your Mark. Be Seen.</h2>
-            <p class="text-slate-400">Welcome to the Web3 Ecosystem</p>
+    <main class="max-w-4xl mx-auto p-6 space-y-8">
+        <section class="text-center py-6">
+            <h2 class="text-4xl font-bold mb-2">Make Your Mark. Be Seen.</h2>
+            <p class="text-slate-400">Welcome to the Web3 Ecosystem & Feed</p>
         </section>
+
+        <!-- Gönderi Paylaşma Alanı (Post Creation Box) -->
+        <div class="bg-slate-900 border border-slate-800 rounded-2xl p-6 shadow-xl">
+            <h3 class="text-lg font-bold mb-4 text-indigo-400">Create a Post</h3>
+            <div class="space-y-4">
+                <input type="text" id="postAuthor" placeholder="Your Handle / Name (e.g., @CryptoKing)" class="w-full bg-slate-800 border border-slate-700 rounded-xl p-3 text-white focus:outline-none focus:border-indigo-500">
+                <textarea id="postContent" placeholder="What's happening in Web3?" rows="3" class="w-full bg-slate-800 border border-slate-700 rounded-xl p-3 text-white focus:outline-none focus:border-indigo-500"></textarea>
+                <input type="text" id="postImage" placeholder="NFT Image Direct URL (.png / .jpg)" class="w-full bg-slate-800 border border-slate-700 rounded-xl p-3 text-white focus:outline-none focus:border-indigo-500">
+                <button onclick="createPost()" class="w-full bg-indigo-600 hover:bg-indigo-500 text-white py-3 rounded-xl font-bold transition-all">Publish Post 🚀</button>
+            </div>
+        </div>
+
+        <!-- Sosyal Akış (Feed) Alanı -->
+        <div class="bg-slate-900 border border-slate-800 rounded-2xl p-6 shadow-xl">
+            <h3 class="text-xl font-bold mb-6 text-indigo-400">Community Feed</h3>
+            <div id="feedContainer" class="space-y-6">
+                <div class="text-center text-slate-500 py-6">Loading feed...</div>
+            </div>
+        </div>
 
         <!-- Tahta (Leaderboard) Alanı -->
         <div class="bg-slate-900 border border-slate-800 rounded-2xl p-6 shadow-xl">
@@ -39,14 +58,11 @@
 
     <!-- JavaScript Kodları -->
     <script>
-        // 1. Cüzdan Bağlama Fonksiyonu
         async function connectWallet() {
             if (window.ethereum) {
                 try {
                     const accounts = await window.ethereum.request({ method: 'eth_requestAccounts' });
-                    const userAccount = accounts[0];
-                    const shortAddress = userAccount.substring(0, 6) + "..." + userAccount.substring(userAccount.length - 4);
-                    
+                    const shortAddress = accounts[0].substring(0, 6) + "..." + accounts[0].substring(accounts[0].length - 4);
                     let btn = document.getElementById('connectWalletBtn');
                     btn.style.background = "#10b981";
                     document.getElementById('btnText').innerText = shortAddress;
@@ -58,7 +74,6 @@
             }
         }
 
-        // 2. Tahtayı Çeken Fonksiyon
         async function fetchFlexWall() {
             try {
                 let res = await fetch('/api/telegram-bot');
@@ -96,7 +111,29 @@
             }
         }
 
+        // Basit bir örnek akış gösterimi (Şimdilik geçici arayüz)
+        function loadFeed() {
+            let feedContainer = document.getElementById('feedContainer');
+            feedContainer.innerHTML = `
+                <div class="bg-slate-800/50 p-4 rounded-xl border border-slate-700/50 space-y-3">
+                    <div class="flex items-center space-x-3">
+                        <div class="w-8 h-8 rounded-full bg-indigo-500 flex items-center justify-center font-bold">P</div>
+                        <div>
+                            <div class="font-bold text-sm">@PoliumOfficial</div>
+                            <div class="text-xs text-slate-500">Just now</div>
+                        </div>
+                    </div>
+                    <p class="text-sm text-slate-300">Welcome to the brand new Polium social feed! Share your thoughts and showcase your NFTs here.</p>
+                </div>
+            `;
+        }
+
+        function createPost() {
+            alert("Post feature backend integration is coming up next! Stay tuned.");
+        }
+
         fetchFlexWall();
+        loadFeed();
     </script>
 </body>
 </html>
