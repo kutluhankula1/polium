@@ -1,6 +1,6 @@
 export default async function handler(req, res) {
     const botToken = "8521072456:AAGwN-R3q67KJ5Wag3D5msFPEuc7-mptTyE";
-    const chatId = "7394428404"; // Senin chat ID'n (özel sohbet veya grup)
+    const chatId = "7394428404";
     const BIN_ID = "6a8cf6a6da38895dfe0ce74c";
     const API_KEY = "$2a$10$G8jaeYrJCOhWdEhjmslybON9oM3pn6Lg8gnAODI5FzEBSc.foYKyS";
 
@@ -61,6 +61,7 @@ export default async function handler(req, res) {
     }
 
     if (req.method === 'POST') {
+        // Telegram'dan gelen buton tıklamaları (Callback Query)
         if (req.body && req.body.callback_query) {
             const callback = req.body.callback_query;
             const dataStr = callback.data;
@@ -78,11 +79,11 @@ export default async function handler(req, res) {
                     let incomingMsg = messageObj.text || "";
                     let lines = incomingMsg.split('\n');
                     
-                    let nameLine = lines.find(l => l.startsWith('👤 İsim:')) || "👤 İsim: @Unknown";
+                    let nameLine = lines.find(l => l.startsWith('👤 İsim:')) || lines.find(l => l.startsWith('🐦 X Handle:')) || "👤 İsim: @Unknown";
                     let msgLine = lines.find(l => l.startsWith('💬 Mesaj:')) || "💬 Mesaj: Flex";
                     let amtLine = lines.find(l => l.startsWith('💰 Tutar:')) || "💰 Tutar: 0 USDT";
 
-                    let name = nameLine.replace('👤 İsim:', '').trim();
+                    let name = nameLine.replace('👤 İsim:', '').replace('🐦 X Handle:', '').trim();
                     let msgText = msgLine.replace('💬 Mesaj:', '').trim();
                     let nftImg = "https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?w=150";
                     
@@ -144,6 +145,7 @@ export default async function handler(req, res) {
             return res.status(200).json({ status: 'ok' });
         }
 
+        // Web sitesinden gelen yeni başvuru formu verisi
         if (req.body.name) {
             const { name, nftImg, message, amount, txid } = req.body;
             const text = `🚀 YENİ POLİUM BASVURUSU!\n\n👤 İsim: ${name}\n💬 Mesaj: ${message}\n💰 Tutar: ${amount} USDT\n🔗 TxID: ${txid}`;
