@@ -67,24 +67,29 @@ export default async function handler(req, res) {
             const callbackQueryId = callback.id;
             const messageObj = callback.message;
 
-            if (dataStr && dataStr.startsWith('cf_')) {
+            if (dataStr === 'cf_yes') {
                 try {
-                    const parts = dataStr.split('|');
-                    const name = decodeURIComponent(parts[1]);
-                    const amount = parseFloat(parseFloat(parts[2]).toFixed(2));
-
                     let getRes = await fetch(`https://api.jsonbin.io/v3/b/${BIN_ID}/latest`, {
                         headers: { 'X-Master-Key': API_KEY }
                     });
                     let binData = await getRes.json();
                     let currentUsers = (binData && binData.record && Array.isArray(binData.record.users)) ? binData.record.users : [];
 
+                    // Telegram mesajından bilgileri direkt satır satır okuyoruz
                     let incomingMsg = messageObj.text || "";
-                    let msgLine = incomingMsg.split('\n').find(l => l.startsWith('💬 Mesaj:')) || "💬 Mesaj: Flex";
-                    let imgLine = incomingMsg.split('\n').find(l => l.startsWith('🖼️ NFT Görsel:')) || "🖼️ NFT Görsel: https://via.placeholder.com/150";
+                    let lines = incomingMsg.split('\n');
+                    
+                    let nameLine = lines.find(l => l.startsWith('🐦 X Handle:')) || "🐦 X Handle: @Unknown";
+                    let imgLine = lines.find(l => l.startsWith('🖼️ NFT Görsel:')) || "🖼️ NFT Görsel: https://via.placeholder.com/150";
+                    let msgLine = lines.find(l => l.startsWith('💬 Mesaj:')) || "💬 Mesaj: Flex";
+                    let amtLine = lines.find(l => l.startsWith('💰 Tutar:')) || "💰 Tutar: 0 USDT";
 
-                    let msgText = msgLine.replace('💬 Mesaj:', '').trim();
+                    let name = nameLine.replace('🐦 X Handle:', '').trim();
                     let nftImg = imgLine.replace('🖼️ NFT Görsel:', '').trim();
+                    let msgText = msgLine.replace('💬 Mesaj:', '').trim();
+                    
+                    let rawAmtStr = amtLine.replace('💰 Tutar:', '').replace('USDT', '').trim();
+                    let amount = parseFloat(parseFloat(rawAmtStr || 0).toFixed(2));
 
                     currentUsers.push({ name, message: msgText, nftImg, amount: amount });
 
@@ -102,7 +107,7 @@ export default async function handler(req, res) {
                         headers: { 'Content-Type': 'application/json' },
                         body: JSON.stringify({ 
                             callback_query_id: callbackQueryId, 
-                            text: "✅ Onaylandı! Flex Duvarına eklendi." 
+                            text: "✅ Onaylandı! Tahta eklendi." 
                         })
                     });
 
@@ -120,7 +125,7 @@ export default async function handler(req, res) {
                 } catch (e) {
                     console.error("Onay hatası:", e);
                 }
-            } else if (dataStr && dataStr.startsWith('rj_')) {
+            } else if (dataStr === 'cf_no') {
                 try {
                     if (messageObj) {
                         await fetch(`https://api.telegram.org/bot${botToken}/answerCallbackQuery`, {
@@ -146,15 +151,14 @@ export default async function handler(req, res) {
 
         if (req.body.name) {
             const { name, nftImg, message, amount, txid } = req.body;
-            const text = `👑 YENİ FLEX & TAHT BAŞVURUSU!\n\n🐦 X Handle: ${name}\n🖼️ NFT Görsel: ${nftImg}\n💬 Mesaj: ${message}\n💰 Tutar: ${amount} USDT\n🔗 TxID: ${txid}`;
+            const text = `👑 YENİ FLEX BAŞVURUSU!\n\n🐦 X Handle: ${name}\n🖼️ NFT Görsel: ${nftImg}\n💬 Mesaj: ${message}\n💰 Tutar: ${amount} USDT\n🔗 TxID: ${txid}`;
 
-            const callbackData = `cf_|${encodeURIComponent(name)}|${amount}`;
-
+            // Callback data artık sadece 6 karakter! Telegram'ın sınırı aşması imkansız, butonlar %100 garantili gelecektir.
             const keyboard = {
                 inline_keyboard: [
                     [
-                        { text: "✅ Onayla (Tahta Ekle)", callback_data: callbackData },
-                        { text: "❌ Reddet", callback_data: `rj_${encodeURIComponent(name)}` }
+                        { text: "✅ Onayla", callback_data: "cf_yes" },
+                        { text: "❌ Reddet", callback_data: "cf_no" }
                     ]
                 ]
             };
