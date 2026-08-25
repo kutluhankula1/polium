@@ -4,17 +4,13 @@ export default async function handler(req, res) {
     const BIN_ID = "6a8cf6a6da38895dfe0ce74c";
     const API_KEY = "$2a$10$G8jaeYrJCOhWdEhjmslybON9oM3pn6Lg8gnAODI5FzEBSc.foYKyS";
 
+    // Örnek sahte flex verileri (Gerçek veriler gelene kadar duvarı dolu ve canlı tutar)
     const baseTemplates = [
-        { name: "CryptoKing", message: "To the moon 🚀" },
-        { name: "Satoshi_N", message: "Building the future" },
-        { name: "WhaleHunter", message: "LFG 🔥" },
-        { name: "BlockchainDev", message: "Web3 is here" },
-        { name: "MoonWalker", message: "Holding strong diamond hands 💎" },
-        { name: "AlphaSeeker", message: "Next 100x gem" },
-        { name: "TokenMaster", message: "Polium to the top!" },
-        { name: "DeFiGod", message: "Yield farming season" },
-        { name: "BitMonster", message: "Bullish on this project" },
-        { name: "SolanaSurfer", message: "Greetings from crypto community" }
+        { name: "@CryptoKing", message: "To the moon 🚀", nftImg: "https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?w=150" },
+        { name: "@Satoshi_N", message: "Building the future", nftImg: "https://images.unsplash.com/photo-1620712943543-bcc4688e7485?w=150" },
+        { name: "@WhaleHunter", message: "LFG 🔥", nftImg: "https://images.unsplash.com/photo-1634017839464-5c339ebe3cb4?w=150" },
+        { name: "@BlockchainDev", message: "Web3 is here", nftImg: "https://images.unsplash.com/photo-1639762681485-074b7f938ba0?w=150" },
+        { name: "@MoonWalker", message: "Diamond hands 💎", nftImg: "https://images.unsplash.com/photo-1642543492481-44e81e3914a7?w=150" }
     ];
 
     if (req.method === 'GET') {
@@ -25,7 +21,6 @@ export default async function handler(req, res) {
             let data = await response.json();
             let rawUsers = (data.record && Array.isArray(data.record.users)) ? data.record.users : [];
 
-            // Gerçek kullanıcıları al (Artık victor filtresi yok, testlerin rahatça görünecek)
             let realUsers = rawUsers.map(u => ({
                 ...u,
                 amount: parseFloat(parseFloat(u.amount || 0).toFixed(2))
@@ -34,27 +29,30 @@ export default async function handler(req, res) {
             let fullList = [...realUsers];
             let index = 0;
             
+            // Rastgele organik azalan mock tutarlar ve NFT görselleri
             let currentMockAmount = 492.35;
-            while (fullList.length < 100) {
+            while (fullList.length < 20) {
                 let template = baseTemplates[index % baseTemplates.length];
                 let randomJump = (Math.sin(index * 99) * 10 + 12) * (1 + (index % 3));
                 currentMockAmount = Math.max(10.50, currentMockAmount - randomJump);
 
-                let centsOptions = [0.00, 0.25, 0.50, 0.75, 0.33, 0.88, 0.45, 0.90, 0.00];
+                let centsOptions = [0.00, 0.25, 0.50, 0.75, 0.33, 0.88, 0.45, 0.90];
                 let baseInt = Math.floor(currentMockAmount);
                 let finalMockAmt = baseInt + centsOptions[(index * 7) % centsOptions.length];
 
                 fullList.push({
                     name: `${template.name}_${fullList.length + 1}`,
                     message: template.message,
+                    nftImg: template.nftImg,
                     amount: parseFloat(finalMockAmt.toFixed(2))
                 });
                 index++;
             }
 
+            // En yüksek tutara göre büyükten küçüğe sıralama (Taht kralı her zaman en üstte)
             fullList.sort((a, b) => b.amount - a.amount);
 
-            let formattedList = fullList.slice(0, 100).map(u => ({
+            let formattedList = fullList.map(u => ({
                 ...u,
                 amount: Number(u.amount).toFixed(2)
             }));
@@ -66,6 +64,7 @@ export default async function handler(req, res) {
     }
 
     if (req.method === 'POST') {
+        // Telegram butonuna (Onayla / Reddet) basıldığında çalışır
         if (req.body && req.body.callback_query) {
             const callback = req.body.callback_query;
             const dataStr = callback.data;
@@ -78,6 +77,7 @@ export default async function handler(req, res) {
                     const name = decodeURIComponent(parts[1]);
                     const amount = parseFloat(parseFloat(parts[2]).toFixed(2));
                     const msgText = decodeURIComponent(parts[3] || '');
+                    const nftImg = decodeURIComponent(parts[4] || '');
 
                     let getRes = await fetch(`https://api.jsonbin.io/v3/b/${BIN_ID}/latest`, {
                         headers: { 'X-Master-Key': API_KEY }
@@ -85,8 +85,8 @@ export default async function handler(req, res) {
                     let binData = await getRes.json();
                     let currentUsers = (binData && binData.record && Array.isArray(binData.record.users)) ? binData.record.users : [];
 
-                    // Yeni kullanıcıyı doğrudan ekle
-                    currentUsers.push({ name, message: msgText, amount: amount });
+                    // Yeni onaylanan flex kullanıcısını veritabanına ekle
+                    currentUsers.push({ name, message: msgText, nftImg, amount: amount });
 
                     await fetch(`https://api.jsonbin.io/v3/b/${BIN_ID}`, {
                         method: 'PUT',
@@ -102,7 +102,7 @@ export default async function handler(req, res) {
                         headers: { 'Content-Type': 'application/json' },
                         body: JSON.stringify({ 
                             callback_query_id: callbackQueryId, 
-                            text: "✅ Başarıyla onaylandı ve siteye eklendi!" 
+                            text: "✅ Onaylandı! Flex Duvarına eklendi." 
                         })
                     });
 
@@ -144,16 +144,17 @@ export default async function handler(req, res) {
             return res.status(200).json({ status: 'ok' });
         }
 
+        // Siteden yeni form gönderildiğinde Telegram'a bildirim atar
         if (req.body.name) {
-            const { name, message, amount, txid } = req.body;
-            const text = `🚀 YENI POLIUM BASVURUSU!\n\n👤 Isim: ${name}\n💬 Mesaj: ${message}\n💰 Tutar: ${amount} USDT\n🔗 TxID: ${txid}`;
+            const { name, nftImg, message, amount, txid } = req.body;
+            const text = `👑 YENİ FLEX & TAHT BAŞVURUSU!\n\n🐦 X Handle: ${name}\n🖼️ NFT Görsel: ${nftImg}\n💬 Mesaj: ${message}\n💰 Tutar: ${amount} USDT\n🔗 TxID: ${txid}`;
 
-            const callbackData = `confirm_|${encodeURIComponent(name)}|${amount}|${encodeURIComponent(message)}`;
+            const callbackData = `confirm_|${encodeURIComponent(name)}|${amount}|${encodeURIComponent(message)}|${encodeURIComponent(nftImg)}`;
 
             const keyboard = {
                 inline_keyboard: [
                     [
-                        { text: "✅ Onayla", callback_data: callbackData },
+                        { text: "✅ Onayla (Tahta Ekle)", callback_data: callbackData },
                         { text: "❌ Reddet", callback_data: `reject_${encodeURIComponent(name)}` }
                     ]
                 ]
