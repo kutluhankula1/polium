@@ -7,14 +7,17 @@
     <script src="https://cdn.tailwindcss.com"></script>
 </head>
 <body class="bg-slate-950 text-white min-h-screen">
- 
+
     <!-- Üst Menü / Navbar -->
     <header class="flex justify-between items-center p-6 border-b border-slate-800">
         <h1 class="text-2xl font-black tracking-wider text-indigo-500">POLIUM</h1>
         
         <!-- Cüzdan Bağlantı Butonu -->
-        <button id="connectWalletBtn" onclick="connectWallet()" style="background: #6366f1; color: white; padding: 10px 20px; border-radius: 8px; border: none; cursor: pointer; font-weight: bold;">
-            🔌 Cüzdanı Bağla
+        <button id="connectWalletBtn" onclick="connectWallet()" class="flex items-center space-x-2 bg-indigo-600 hover:bg-indigo-500 text-white px-5 py-2.5 rounded-xl font-bold transition-all shadow-lg shadow-indigo-600/20">
+            <svg class="w-5 h-5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" d="M21 12V7H3v5m18 0v5H3v-5m18 0H3m15-4h.01M18 16h.01"></path>
+            </svg>
+            <span id="btnText">Connect Wallet</span>
         </button>
     </header>
 
@@ -22,14 +25,14 @@
     <main class="max-w-4xl mx-auto p-6">
         <section class="text-center py-10">
             <h2 class="text-4xl font-bold mb-4">Make Your Mark. Be Seen.</h2>
-            <p class="text-slate-400">Web3 Ekosistemine Hoş Geldin</p>
+            <p class="text-slate-400">Welcome to the Web3 Ecosystem</p>
         </section>
 
         <!-- Tahta (Leaderboard) Alanı -->
         <div class="bg-slate-900 border border-slate-800 rounded-2xl p-6 shadow-xl">
             <h3 class="text-xl font-bold mb-6 text-indigo-400">Leaderboard</h3>
             <div id="flexWallContainer" class="space-y-4">
-                <div class="text-center text-slate-500 py-10">Yükleniyor...</div>
+                <div class="text-center text-slate-500 py-10">Loading leaderboard...</div>
             </div>
         </div>
     </main>
@@ -45,19 +48,17 @@
                     const shortAddress = userAccount.substring(0, 6) + "..." + userAccount.substring(userAccount.length - 4);
                     
                     let btn = document.getElementById('connectWalletBtn');
-                    btn.innerText = "✅ " + shortAddress;
                     btn.style.background = "#10b981";
-                    
-                    alert("Cüzdan başarıyla bağlandı: " + userAccount);
+                    document.getElementById('btnText').innerText = shortAddress;
                 } catch (error) {
-                    alert("Cüzdan bağlantısı reddedildi.");
+                    alert("Wallet connection request was rejected.");
                 }
             } else {
-                alert("Lütfen tarayıcında MetaMask veya benzeri bir Web3 cüzdanı kurulu olduğundan emin ol!");
+                alert("Please make sure MetaMask or a Web3 wallet is installed in your browser!");
             }
         }
 
-        // 2. Tahtayı (Leaderboard) Çeken Fonksiyon
+        // 2. Tahtayı Çeken Fonksiyon
         async function fetchFlexWall() {
             try {
                 let res = await fetch('/api/telegram-bot');
@@ -66,7 +67,7 @@
 
                 let container = document.getElementById('flexWallContainer');
                 if (users.length === 0) {
-                    container.innerHTML = '<div class="text-center text-slate-500 py-10">Henüz kimse tahtaya oturmadı. İlk sen ol!</div>';
+                    container.innerHTML = '<div class="text-center text-slate-500 py-10">No entries on the board yet. Be the first one!</div>';
                     return;
                 }
 
@@ -91,11 +92,10 @@
                 });
                 container.innerHTML = html;
             } catch (err) {
-                console.error("Tahta yüklenirken hata:", err);
+                console.error("Error loading leaderboard:", err);
             }
         }
 
-        // Sayfa açıldığında tahtayı yükle
         fetchFlexWall();
     </script>
 </body>
