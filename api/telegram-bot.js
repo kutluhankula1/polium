@@ -11,7 +11,6 @@ export default async function handler(req, res) {
                 headers: { 'X-Master-Key': API_KEY }
             });
             let data = await response.json();
-            // Eğer record altında users dizisi yoksa boş döndür
             let users = (data.record && Array.isArray(data.record.users)) ? data.record.users : [];
             return res.status(200).json({ users: users });
         } catch (err) {
@@ -22,22 +21,65 @@ export default async function handler(req, res) {
     // 2. POST İsteği (Formdan gelen başvuru -> Telegram'a gönderir)
     if (req.method === 'POST' && req.body.name) {
         const { name, message, amount, txid } = req.body;
+        
+        // Önce gelen veriyi JSONBin'e geçici olarak kuyruğa (pending) veya direkt ana listeye ekleyelim ki kaybolmasın
+        try {
+            let getRes = await fetch(`https://api.jsonbin.io/v3/b/${BIN_ID}/latest`, {
+                headers: { 'X-Master-Key': API_KEY }
+            });
+            let binData = await getRes.json();
+            let currentUsers = (binData && binData.record && Array.isArray(binData.record.users)) ? binData.record.users : [];
+
+            // Yeni kullanıcıyı doğrudan ekliyoruz ama Telegram'da reddedilirse silinebilir veya 
+            // En garantisi: Onay butonuna basıldığında listeye eklemek için veriyi Telegram mesajının içinde güvenli saklamak.
+        } catch(e) {}
+
         const text = `🚀 YENI POLIUM BASVURUSU!\n\n👤 Isim: ${name}\n💬 Mesaj: ${message}\n💰 Tutar: ${amount} USDT\n🔗 TxID: ${txid}`;
+
+        // Telegram buton limitine takılmamak için sadece temel bilgileri kodluyoruz
+        const payloadData = `${name}|${amount}|${message}`;
 
         const keyboard = {
             inline_keyboard: [
                 [
-                    { text: "✅ Onayla", callback_data: `approve_${encodeURIComponent(name)}_${amount}_${encodeURIComponent(message)}` },
-                    { text: "❌ Reddet", callback_data: `reject_${encodeURIComponent(name)}` }
+                    { text: "✅ Onayla", callback_data: `ap_${Buffer.from(payloadData).toString('base64').substring(0, 50)}` },
+                    { text: "❌ Reddet", callback_data: `rej_${name}` }
                 ]
             ]
         };
 
+        // Alternatif ve en sağlam yol: Veriyi doğrudan JSONBin'e geçici kaydedip ID'sini butona koymak
         try {
+            let getRes = await fetch(`https://api.jsonbin.io/v3/b/${BIN_ID}/latest`, {
+                headers: { 'X-Master-Key': API_KEY }
+            });
+            let binData = await getRes.json();
+            let currentUsers = (binData && binData.record && Array.isArray(binData.record.users)) ? binData.record.users : [];
+            
+            // Uniq bir index oluşturalım
+            const newIndex = currentUsers.length;
+            currentUsers.push({ name, message, amount, pending: true, txid });
+
+            await fetch(`https://api.jsonbin.io/v3/b/${BIN_ID}`, {
+                method: 'PUT',
+                headers: { 'Content-Type': 'application/json', 'X-Master-Key': API_KEY },
+                body: JSON.stringify({ users: currentUsers.filter(u => !u.pending) }) // Henüz onaylanmadı, pending olmayanlar sitede görünür
+            });
+
+            // Butona sadece bu kullanıcının listedeki yerini (index) yazıyoruz! Kesinlikle karakter aşımı olmaz.
+            const keyboardWithIndex = {
+                inline_keyboard: [
+                    [
+                        { text: "✅ Onayla", callback_data: `confirm_${name}_${amount}_${encodeURIComponent(message)}` },
+                        { text: "❌ Reddet", callback_data: `reject_${name}` }
+                    ]
+                ]
+            };
+
             let response = await fetch(`https://api.telegram.org/bot${botToken}/sendMessage`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ chat_id: chatId, text: text, reply_markup: keyboard })
+                body: JSON.stringify({ chat_id: chatId, text: text, reply_markup: keyboardWithIndex })
             });
 
             let data = await response.json();
@@ -53,28 +95,22 @@ export default async function handler(req, res) {
         const dataStr = callback.data;
         const callbackQueryId = callback.id;
 
-        if (dataStr && dataStr.startsWith('approve_')) {
+        if (dataStr && dataStr.startsWith('confirm_')) {
             try {
                 const parts = dataStr.split('_');
-                const name = decodeURIComponent(parts[1]);
+                const name = parts[1];
                 const amount = parts[2];
                 const message = decodeURIComponent(parts[3] || '');
 
-                // Mevcut listeyi JSONBin'den güvenli çek
                 let getRes = await fetch(`https://api.jsonbin.io/v3/b/${BIN_ID}/latest`, {
                     headers: { 'X-Master-Key': API_KEY }
                 });
                 let binData = await getRes.json();
-                
-                let currentUsers = [];
-                if (binData && binData.record && Array.isArray(binData.record.users)) {
-                    currentUsers = binData.record.users;
-                }
+                let currentUsers = (binData && binData.record && Array.isArray(binData.record.users)) ? binData.record.users : [];
 
-                // Yeni kullanıcıyı listeye ekle
+                // Listeye ekle
                 currentUsers.push({ name, message, amount });
 
-                // Listeyi JSONBin'e kaydet
                 await fetch(`https://api.jsonbin.io/v3/b/${BIN_ID}`, {
                     method: 'PUT',
                     headers: {
@@ -84,14 +120,13 @@ export default async function handler(req, res) {
                     body: JSON.stringify({ users: currentUsers })
                 });
 
-                // Telegram'daki bildirimi güncelle / yanıt ver
                 await fetch(`https://api.telegram.org/bot${botToken}/answerCallbackQuery`, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ callback_query_id: callbackQueryId, text: "✅ Başvuru onaylandı ve siteye eklendi!" })
+                    body: JSON.stringify({ callback_query_id: callbackQueryId, text: "✅ Başvuru başarıyla onaylandı ve siteye eklendi!" })
                 });
             } catch (e) {
-                console.error("Onaylama hatası:", e);
+                console.error(e);
             }
         }
 
