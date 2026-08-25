@@ -67,42 +67,34 @@ export default async function handler(req, res) {
             const callbackQueryId = callback.id;
             const messageObj = callback.message;
 
-            if (dataStr && dataStr.startsWith('ok_')) {
+            if (dataStr === 'approve_latest') {
                 try {
-                    // Veriyi doğrudan Telegram buton verisinden güvenle alıyoruz (Asla hata yapmaz)
-                    const parts = dataStr.split('__');
-                    // parts[0] = ok_HANDLE, parts[1] = AMOUNT, parts[2] = MSG, parts[3] = IMG
-                    const name = decodeURIComponent(parts[0].replace('ok_', ''));
-                    const amount = parseFloat(parseFloat(parts[1]).toFixed(2));
-                    const msgText = decodeURIComponent(parts[2] || '');
-                    const nftImg = decodeURIComponent(parts[3] || '');
-
                     let getRes = await fetch(`https://api.jsonbin.io/v3/b/${BIN_ID}/latest`, {
                         headers: { 'X-Master-Key': API_KEY }
                     });
                     let binData = await getRes.json();
-                    
-                    // Sadece users dizisini güvenle alıyoruz
-                    let currentUsers = [];
-                    if (binData && binData.record) {
-                        if (Array.isArray(binData.record.users)) {
-                            currentUsers = binData.record.users;
-                        } else if (Array.isArray(binData.record)) {
-                            currentUsers = binData.record;
-                        }
+                    let currentUsers = (binData && binData.record && Array.isArray(binData.record.users)) ? binData.record.users : [];
+                    let pendingList = (binData && binData.record && Array.isArray(binData.record.pending)) ? binData.record.pending : [];
+
+                    // Bekleyen en son başvuruyu ana listeye taşı
+                    if (pendingList.length > 0) {
+                        let latestItem = pendingList.pop(); // En son ekleni al
+                        currentUsers.push({
+                            name: latestItem.name,
+                            message: latestItem.message,
+                            nftImg: latestItem.nftImg,
+                            amount: parseFloat(latestItem.amount)
+                        });
+
+                        await fetch(`https://api.jsonbin.io/v3/b/${BIN_ID}`, {
+                            method: 'PUT',
+                            headers: {
+                                'Content-Type': 'application/json',
+                                'X-Master-Key': API_KEY
+                            },
+                            body: JSON.stringify({ users: currentUsers, pending: pendingList })
+                        });
                     }
-
-                    currentUsers.push({ name, message: msgText, nftImg, amount: amount });
-
-                    // JSONBin'e sadece users listesini tertemiz kaydediyoruz
-                    await fetch(`https://api.jsonbin.io/v3/b/${BIN_ID}`, {
-                        method: 'PUT',
-                        headers: {
-                            'Content-Type': 'application/json',
-                            'X-Master-Key': API_KEY
-                        },
-                        body: JSON.stringify({ users: currentUsers })
-                    });
 
                     await fetch(`https://api.telegram.org/bot${botToken}/answerCallbackQuery`, {
                         method: 'POST',
@@ -127,15 +119,34 @@ export default async function handler(req, res) {
                 } catch (e) {
                     console.error("Onay hatası:", e);
                 }
-            } else if (dataStr && dataStr.startsWith('no_')) {
+            } else if (dataStr === 'reject_latest') {
                 try {
+                    let getRes = await fetch(`https://api.jsonbin.io/v3/b/${BIN_ID}/latest`, {
+                        headers: { 'X-Master-Key': API_KEY }
+                    });
+                    let binData = await getRes.json();
+                    let currentUsers = (binData && binData.record && Array.isArray(binData.record.users)) ? binData.record.users : [];
+                    let pendingList = (binData && binData.record && Array.isArray(binData.record.pending)) ? binData.record.pending : [];
+
+                    if (pendingList.length > 0) {
+                        pendingList.pop(); // Bekleyenden sil
+                        await fetch(`https://api.jsonbin.io/v3/b/${BIN_ID}`, {
+                            method: 'PUT',
+                            headers: {
+                                'Content-Type': 'application/json',
+                                'X-Master-Key': API_KEY
+                            },
+                            body: JSON.stringify({ users: currentUsers, pending: pendingList })
+                        });
+                    }
+
                     if (messageObj) {
                         await fetch(`https://api.telegram.org/bot${botToken}/answerCallbackQuery`, {
                             method: 'POST',
                             headers: { 'Content-Type': 'application/json' },
                             body: JSON.stringify({ callback_query_id: callbackQueryId, text: "❌ Reddedildi." })
                         });
-                        await fetch(`https://api.telegram.org/bot${botToken}/editMessageReplyMarkup`, {
+                        await fetch(`https://api.telegram.org/bot${botToken}/editMessageFilter` / `${botToken}/editMessageReplyMarkup`, {
                             method: 'POST',
                             headers: { 'Content-Type': 'application/json' },
                             body: JSON.stringify({
@@ -153,22 +164,36 @@ export default async function handler(req, res) {
 
         if (req.body.name) {
             const { name, nftImg, message, amount, txid } = req.body;
+
+            // Veriyi geçici olarak pending dizisine atıyoruz
+            try {
+                let getRes = await fetch(`https://api.jsonbin.io/v3/b/${BIN_ID}/latest`, {
+                    headers: { 'X-Master-Key': API_KEY }
+                });
+                let binData = await getRes.json();
+                let currentUsers = (binData && binData.record && Array.isArray(binData.record.users)) ? binData.record.users : [];
+                let pendingList = (binData && binData.record && Array.isArray(binData.record.pending)) ? binData.record.pending : [];
+
+                pendingList.push({ name, nftImg, message, amount: parseFloat(amount) });
+
+                await fetch(`https://api.jsonbin.io/v3/b/${BIN_ID}`, {
+                    method: 'PUT',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'X-Master-Key': API_KEY
+                    },
+                    body: JSON.stringify({ users: currentUsers, pending: pendingList })
+                });
+            } catch(err) {}
+
             const text = `👑 YENİ FLEX BAŞVURUSU!\n\n🐦 X Handle: ${name}\n💬 Mesaj: ${message}\n💰 Tutar: ${amount} USDT\n🔗 TxID: ${txid}`;
 
-            // Telegram 64 bayt sınırını aşmayacak şekilde kısa ama tüm veriyi taşıyan yapı
-            const encodedName = encodeURIComponent(name);
-            const encodedMsg = encodeURIComponent(message || '');
-            const encodedImg = encodeURIComponent(nftImg || '');
-            
-            // Eğer URL çok uzunsa buton hatası vermemesi için kısa bir özet ekliyoruz, onay butonuna tıklandığında veri işleniyor
-            const callbackData = `ok_${encodedName}__${amount}__${encodedMsg}__${encodedImg}`.slice(0, 64);
-            const rejectData = `no_${encodedName}`.slice(0, 64);
-
+            // Callback data sadece birkaç harften oluşur, bu sayede Telegram butonu %100 garanti gelir!
             const keyboard = {
                 inline_keyboard: [
                     [
-                        { text: "✅ Onayla", callback_data: callbackData },
-                        { text: "❌ Reddet", callback_data: rejectData }
+                        { text: "✅ Onayla", callback_data: "approve_latest" },
+                        { text: "❌ Reddet", callback_data: "reject_latest" }
                     ]
                 ]
             };
