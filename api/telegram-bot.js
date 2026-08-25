@@ -4,7 +4,6 @@ export default async function handler(req, res) {
     const BIN_ID = "6a8cf6a6da38895dfe0ce74c";
     const API_KEY = "$2a$10$G8jaeYrJCOhWdEhjmslybON9oM3pn6Lg8gnAODI5FzEBSc.foYKyS";
 
-    // Örnek (Placeholder) isimler ve mesajlar havuzu (100'e tamamlamak için)
     const dummyPool = [
         { name: "CryptoKing", message: "To the moon 🚀" },
         { name: "Satoshi_N", message: "Building the future" },
@@ -27,16 +26,15 @@ export default async function handler(req, res) {
             let data = await response.json();
             let realUsers = (data.record && Array.isArray(data.record.users)) ? data.record.users : [];
 
-            // A) Gerçek kullanıcıları ödedikleri miktara göre büyükten küçüğe sırala (Number dönüşümü yaparak)
+            // Gerçek kullanıcıları ödedikleri miktara göre büyükten küçüğe sırala
             realUsers.sort((a, b) => parseFloat(b.amount || 0) - parseFloat(a.amount || 0));
 
-            // B) Eğer 100'den azsa, kalan kısmı rastgele/örnek kullanıcılarla 100'e tamamla
+            // Listeyi 100'e tamamla
             let fullList = [...realUsers];
             let dummyIndex = 0;
             
             while (fullList.length < 100) {
                 let baseUser = dummyPool[dummyIndex % dummyPool.length];
-                // Rastgele ama mantıklı tutarlar üretelim (10 ile 500 USDT arası)
                 let randomAmount = Math.floor(Math.random() * 490) + 10;
                 
                 fullList.push({
@@ -48,9 +46,6 @@ export default async function handler(req, res) {
                 dummyIndex++;
             }
 
-            // Örnekleri de kendi aralarında tutara göre sıralayalım ki gerçeklerin arasına doğru yerleşsinler veya en alta kalsınlar
-            // İstersen gerçekler her zaman üstte kalır, arkasından dummy'ler dizilir:
-            // Gerçekleri öne koyup, dummy'leri kendi içinde sıralayabiliriz:
             let dummyUsers = fullList.filter(u => u.isDummy);
             dummyUsers.sort((a, b) => b.amount - a.amount);
 
@@ -83,10 +78,8 @@ export default async function handler(req, res) {
                     let binData = await getRes.json();
                     let currentUsers = (binData && binData.record && Array.isArray(binData.record.users)) ? binData.record.users : [];
 
-                    // Yeni gerçek kullanıcıyı ekle
                     currentUsers.push({ name, message: msgText, amount: parseFloat(amount) });
 
-                    // JSONBin'e kaydet
                     await fetch(`https://api.jsonbin.io/v3/b/${BIN_ID}`, {
                         method: 'PUT',
                         headers: {
@@ -127,7 +120,6 @@ export default async function handler(req, res) {
                             headers: { 'Content-Type': 'application/json' },
                             body: JSON.stringify({ callback_query_id: callbackQueryId, text: "❌ Başvuru reddedildi." })
                         });
-                        await fetch(`https://api.telegram.org/bot${botToken}/editMessageRule`, { ... }); // pass
                         await fetch(`https://api.telegram.org/bot${botToken}/editMessageReplyMarkup`, {
                             method: 'POST',
                             headers: { 'Content-Type': 'application/json' },
