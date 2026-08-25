@@ -1,6 +1,6 @@
 export default async function handler(req, res) {
     const botToken = "8521072456:AAGwN-R3q67KJ5Wag3D5msFPEuc7-mptTyE";
-    const chatId = "7394428404";
+    const chatId = "7394428404"; // Senin chat ID'n (özel sohbet veya grup)
     const BIN_ID = "6a8cf6a6da38895dfe0ce74c";
     const API_KEY = "$2a$10$G8jaeYrJCOhWdEhjmslybON9oM3pn6Lg8gnAODI5FzEBSc.foYKyS";
 
@@ -78,14 +78,13 @@ export default async function handler(req, res) {
                     let incomingMsg = messageObj.text || "";
                     let lines = incomingMsg.split('\n');
                     
-                    let nameLine = lines.find(l => l.startsWith('🐦 X Handle:')) || "🐦 X Handle: @Unknown";
-                    let imgLine = lines.find(l => l.startsWith('🖼️ NFT Görsel:')) || "🖼️ NFT Görsel: https://via.placeholder.com/150";
+                    let nameLine = lines.find(l => l.startsWith('👤 İsim:')) || "👤 İsim: @Unknown";
                     let msgLine = lines.find(l => l.startsWith('💬 Mesaj:')) || "💬 Mesaj: Flex";
                     let amtLine = lines.find(l => l.startsWith('💰 Tutar:')) || "💰 Tutar: 0 USDT";
 
-                    let name = nameLine.replace('🐦 X Handle:', '').trim();
-                    let nftImg = imgLine.replace('🖼️ NFT Görsel:', '').trim();
+                    let name = nameLine.replace('👤 İsim:', '').trim();
                     let msgText = msgLine.replace('💬 Mesaj:', '').trim();
+                    let nftImg = "https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?w=150";
                     
                     let rawAmtStr = amtLine.replace('💰 Tutar:', '').replace('USDT', '').trim();
                     let amount = parseFloat(parseFloat(rawAmtStr || 0).toFixed(2));
@@ -104,7 +103,7 @@ export default async function handler(req, res) {
                     await fetch(`https://api.telegram.org/bot${botToken}/answerCallbackQuery`, {
                         method: 'POST',
                         headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({ callback_query_id: callbackQueryId, text: "✅ Onaylandı!" })
+                        body: JSON.stringify({ callback_query_id: callbackQueryId, text: "✅ Onaylandı ve Tahtaya Eklendi!" })
                     });
 
                     if (messageObj) {
@@ -127,7 +126,7 @@ export default async function handler(req, res) {
                         await fetch(`https://api.telegram.org/bot${botToken}/answerCallbackQuery`, {
                             method: 'POST',
                             headers: { 'Content-Type': 'application/json' },
-                            body: JSON.stringify({ callback_query_id: callbackQueryId, text: "❌ Reddedildi." })
+                            body: JSON.stringify({ callback_query_id: callbackQueryId, text: "❌ Başvuru reddedildi." })
                         });
                         await fetch(`https://api.telegram.org/bot${botToken}/editMessageReplyMarkup`, {
                             method: 'POST',
@@ -147,7 +146,7 @@ export default async function handler(req, res) {
 
         if (req.body.name) {
             const { name, nftImg, message, amount, txid } = req.body;
-            const text = `👑 YENİ FLEX BAŞVURUSU!\n\n🐦 X Handle: ${name}\n🖼️ NFT Görsel: ${nftImg}\n💬 Mesaj: ${message}\n💰 Tutar: ${amount} USDT\n🔗 TxID: ${txid}`;
+            const text = `🚀 YENİ POLİUM BASVURUSU!\n\n👤 İsim: ${name}\n💬 Mesaj: ${message}\n💰 Tutar: ${amount} USDT\n🔗 TxID: ${txid}`;
 
             const payload = {
                 chat_id: chatId,
@@ -170,14 +169,11 @@ export default async function handler(req, res) {
                 });
 
                 let data = await response.json();
-                console.log("Telegram API Yanıtı:", JSON.stringify(data)); // Vercel loglarında görebilmek için
-
                 if (!data.ok) {
                     return res.status(400).json({ error: data.description });
                 }
                 return res.status(200).json({ success: true });
             } catch (err) {
-                console.error("Fetch Hatası:", err);
                 return res.status(500).json({ error: err.message });
             }
         }
