@@ -69,42 +69,44 @@ export default async function handler(req, res) {
 
             if (dataStr && dataStr.startsWith('cf_')) {
                 try {
-                    // Telegram byte sınırını aşmamak için veriyi akıllıca parse ediyoruz
-                    const parts = dataStr.split('|');
-                    const name = decodeURIComponent(parts[1]);
-                    const amount = parseFloat(parseFloat(parts[2]).toFixed(2));
-
                     let getRes = await fetch(`https://api.jsonbin.io/v3/b/${BIN_ID}/latest`, {
                         headers: { 'X-Master-Key': API_KEY }
                     });
                     let binData = await getRes.json();
                     let currentUsers = (binData && binData.record && Array.isArray(binData.record.users)) ? binData.record.users : [];
+                    let pendingQueue = (binData && binData.record && Array.isArray(binData.record.pending)) ? binData.record.pending : [];
 
-                    // Mesaj metninden (Telegram mesajından) gönderilen bilgileri güvenle eşleştirip buluyoruz
-                    let incomingMsg = messageObj.text || "";
-                    let msgLine = incomingMsg.split('\n').find(l => l.startsWith('💬 Mesaj:')) || "💬 Mesaj: Flex";
-                    let imgLine = incomingMsg.split('\n').find(l => l.startsWith('🖼️ NFT Görsel:')) || "🖼️ NFT Görsel: https://via.placeholder.com/150";
+                    // Hangi başvuruye basıldığını ID üzerinden buluyoruz
+                    let targetId = dataStr.replace('cf_', '');
+                    let targetItem = pendingQueue.find(p => p.id === targetId);
 
-                    let msgText = msgLine.replace('💬 Mesaj:', '').trim();
-                    let nftImg = imgLine.replace('🖼️ NFT Görsel:', '').trim();
+                    if (targetItem) {
+                        currentUsers.push({
+                            name: targetItem.name,
+                            message: targetItem.message,
+                            nftImg: targetItem.nftImg,
+                            amount: targetItem.amount
+                        });
+                        
+                        // Bekleyenlerden çıkar
+                        let updatedPending = pendingQueue.filter(p => p.id !== targetId);
 
-                    currentUsers.push({ name, message: msgText, nftImg, amount: amount });
-
-                    await fetch(`https://api.jsonbin.io/v3/b/${BIN_ID}`, {
-                        method: 'PUT',
-                        headers: {
-                            'Content-Type': 'application/json',
-                            'X-Master-Key': API_KEY
-                        },
-                        body: JSON.stringify({ users: currentUsers })
-                    });
+                        await fetch(`https://api.jsonbin.io/v3/b/${BIN_ID}`, {
+                            method: 'PUT',
+                            headers: {
+                                'Content-Type': 'application/json',
+                                'X-Master-Key': API_KEY
+                            },
+                            body: JSON.stringify({ users: currentUsers, pending: updatedPending })
+                        });
+                    }
 
                     await fetch(`https://api.telegram.org/bot${botToken}/answerCallbackQuery`, {
                         method: 'POST',
                         headers: { 'Content-Type': 'application/json' },
                         body: JSON.stringify({ 
                             callback_query_id: callbackQueryId, 
-                            text: "✅ Onaylandı! Flex Duvarına eklendi." 
+                            text: "✅ Onaylandı! Tahta eklendi." 
                         })
                     });
 
@@ -128,7 +130,7 @@ export default async function handler(req, res) {
                         await fetch(`https://api.telegram.org/bot${botToken}/answerCallbackQuery`, {
                             method: 'POST',
                             headers: { 'Content-Type': 'application/json' },
-                            body: JSON.stringify({ callback_query_id: callbackQueryId, text: "❌ Başvuru reddedildi." })
+                            body: JSON.stringify({ callback_query_id: callbackQueryId, text: "❌ Reddedildi." })
                         });
                         await fetch(`https://api.telegram.org/bot${botToken}/editMessageReplyMarkup`, {
                             method: 'POST',
@@ -148,16 +150,37 @@ export default async function handler(req, res) {
 
         if (req.body.name) {
             const { name, nftImg, message, amount, txid } = req.body;
-            const text = `👑 YENİ FLEX & TAHT BAŞVURUSU!\n\n🐦 X Handle: ${name}\n🖼️ NFT Görsel: ${nftImg}\n💬 Mesaj: ${message}\n💰 Tutar: ${amount} USDT\n🔗 TxID: ${txid}`;
+            const uniqueId = 'p_' + Date.now().toString().slice(-6);
 
-            // Boyutu küçük tutarak Telegram byte sınırını koruyoruz (cf_ = confirm, rj_ = reject)
-            const callbackData = `cf_|${encodeURIComponent(name)}|${amount}`;
+            // Veriyi güvenle JSONBin içinde geçici tutuyoruz
+            try {
+                let getRes = await fetch(`https://api.jsonbin.io/v3/b/${BIN_ID}/latest`, {
+                    headers: { 'X-Master-Key': API_KEY }
+                });
+                let binData = await getRes.json();
+                let currentUsers = (binData && binData.record && Array.isArray(binData.record.users)) ? binData.record.users : [];
+                let pendingQueue = (binData && binData.record && Array.isArray(binData.record.pending)) ? binData.record.pending : [];
 
+                pendingQueue.push({ id: uniqueId, name, nftImg, message, amount: parseFloat(amount) });
+
+                await fetch(`https://api.jsonbin.io/v3/b/${BIN_ID}`, {
+                    method: 'PUT',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'X-Master-Key': API_KEY
+                    },
+                    body: JSON.stringify({ users: currentUsers, pending: pendingQueue })
+                });
+            } catch(err) {}
+
+            const text = `👑 YENİ FLEX BAŞVURUSU!\n\n🐦 X Handle: ${name}\n💬 Mesaj: ${message}\n💰 Tutar: ${amount} USDT\n🔗 TxID: ${txid}`;
+
+            // Sadece kısa ID taşıdığı için Telegram butonu asla hata vermez, garanti açılır!
             const keyboard = {
                 inline_keyboard: [
                     [
-                        { text: "✅ Onayla (Tahta Ekle)", callback_data: callbackData },
-                        { text: "❌ Reddet", callback_data: `rj_${encodeURIComponent(name)}` }
+                        { text: "✅ Onayla", callback_data: `cf_${uniqueId}` },
+                        { text: "❌ Reddet", callback_data: `rj_${uniqueId}` }
                     ]
                 ]
             };
