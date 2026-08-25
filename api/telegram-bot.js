@@ -4,7 +4,6 @@ export default async function handler(req, res) {
     const BIN_ID = "6a8cf6a6da38895dfe0ce74c";
     const API_KEY = "$2a$10$G8jaeYrJCOhWdEhjmslybON9oM3pn6Lg8gnAODI5FzEBSc.foYKyS";
 
-    // Örnek kullanıcı şablonları
     const baseTemplates = [
         { name: "CryptoKing", message: "To the moon 🚀" },
         { name: "Satoshi_N", message: "Building the future" },
@@ -18,7 +17,6 @@ export default async function handler(req, res) {
         { name: "SolanaSurfer", message: "Greetings from crypto community" }
     ];
 
-    // 1. GET İsteği: Siteden liste istendiğinde
     if (req.method === 'GET') {
         try {
             let response = await fetch(`https://api.jsonbin.io/v3/b/${BIN_ID}/latest`, {
@@ -27,44 +25,57 @@ export default async function handler(req, res) {
             let data = await response.json();
             let rawUsers = (data.record && Array.isArray(data.record.users)) ? data.record.users : [];
 
-            // A) "victor" spam kalıntılarını temizle
-            let realUsers = rawUsers.filter(u => {
-                const n = (u.name || "").toLowerCase();
-                return !n.includes("victor");
-            });
+            // Spam temizliği ve ondalık formatı
+            let realUsers = rawUsers
+                .filter(u => {
+                    const n = (u.name || "").toLowerCase();
+                    return !n.includes("victor");
+                })
+                .map(u => ({
+                    ...u,
+                    amount: parseFloat(parseFloat(u.amount || 0).toFixed(2))
+                }));
 
-            // B) Tüm kullanıcıların miktarını sayısal değere çevir
-            realUsers.forEach(u => u.amount = parseFloat(u.amount || 0));
-
-            // C) Listeyi 100 kişiye tamamlamak için örnekler üret (Tutarları kademeli azalan şekilde verelim ki mantıklı bir dağılım olsun)
             let fullList = [...realUsers];
             let index = 0;
             
-            // Eğer gerçek kullanıcı sayısı 100'den azsa, kalan kısmı 500'den aşağıya doğru azalan örneklerle dolduralım
-            let currentMockAmount = 500;
+            // Tamamen doğal, organik ve küsuratlı azalan örnek tutarlar üretimi
+            let currentMockAmount = 485.50;
             while (fullList.length < 100) {
                 let template = baseTemplates[index % baseTemplates.length];
-                // Gerçek kullanıcıların arasına karışabilmesi veya altına düzgün dizilmesi için miktar üretiyoruz
-                let mockAmt = Math.max(10, currentMockAmount - (index * 4));
                 
+                // Her adımda birbirinden farklı, rastgele ama aşağıya doğru inen küsuratlı düşüşler (1.5 ile 7.3 dolar arası rastgele düşüşler)
+                let dropStep = (index % 3 === 0) ? 2.15 : (index % 2 === 0) ? 4.80 : 3.25;
+                currentMockAmount = Math.max(12.50, currentMockAmount - dropStep);
+
+                // Küsuratları rastgele çeşitlendirelim ki tamamen organik dursun
+                let randomCents = [0.00, 0.25, 0.50, 0.75, 0.33, 0.88, 0.45, 0.90];
+                let baseInt = Math.floor(currentMockAmount);
+                let finalMockAmt = baseInt + randomCents[index % randomCents.length];
+
                 fullList.push({
                     name: `${template.name}_${fullList.length + 1}`,
                     message: template.message,
-                    amount: mockAmt
+                    amount: parseFloat(finalMockAmt.toFixed(2))
                 });
                 index++;
             }
 
-            // D) EN ÖNEMLİ KISIM: Tüm listeyi (gerçekler + örnekler dahil) ödenen miktara göre EN YÜKSEKTEN EN DÜŞÜĞE sırala!
+            // Büyükten küçüğe kusursuz sıralama
             fullList.sort((a, b) => b.amount - a.amount);
 
-            return res.status(200).json({ users: fullList.slice(0, 100) });
+            // Sitede gösterilirken .toFixed(2) garantisiyle gönderelim ($144.00 gibi görünmesi için)
+            let formattedList = fullList.slice(0, 100).map(u => ({
+                ...u,
+                amount: Number(u.amount).toFixed(2)
+            }));
+
+            return res.status(200).json({ users: formattedList });
         } catch (err) {
             return res.status(200).json({ users: [] });
         }
     }
 
-    // 2. POST İsteği
     if (req.method === 'POST') {
         if (req.body && req.body.callback_query) {
             const callback = req.body.callback_query;
@@ -76,7 +87,7 @@ export default async function handler(req, res) {
                 try {
                     const parts = dataStr.split('|');
                     const name = decodeURIComponent(parts[1]);
-                    const amount = parseFloat(parts[2]);
+                    const amount = parseFloat(parseFloat(parts[2]).toFixed(2));
                     const msgText = decodeURIComponent(parts[3] || '');
 
                     let getRes = await fetch(`https://api.jsonbin.io/v3/b/${BIN_ID}/latest`, {
@@ -85,7 +96,6 @@ export default async function handler(req, res) {
                     let binData = await getRes.json();
                     let currentUsers = (binData && binData.record && Array.isArray(binData.record.users)) ? binData.record.users : [];
 
-                    // Spamları temizle ve yeniyi ekle
                     currentUsers = currentUsers.filter(u => !u.name || !u.name.toLowerCase().includes("victor"));
                     currentUsers.push({ name, message: msgText, amount: amount });
 
