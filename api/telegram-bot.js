@@ -4,7 +4,6 @@ export default async function handler(req, res) {
     const BIN_ID = "6a8cf6a6da38895dfe0ce74c";
     const API_KEY = "$2a$10$G8jaeYrJCOhWdEhjmslybON9oM3pn6Lg8gnAODI5FzEBSc.foYKyS";
 
-    // Örnek sahte flex verileri (Gerçek veriler gelene kadar duvarı dolu ve canlı tutar)
     const baseTemplates = [
         { name: "@CryptoKing", message: "To the moon 🚀", nftImg: "https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?w=150" },
         { name: "@Satoshi_N", message: "Building the future", nftImg: "https://images.unsplash.com/photo-1620712943543-bcc4688e7485?w=150" },
@@ -29,7 +28,6 @@ export default async function handler(req, res) {
             let fullList = [...realUsers];
             let index = 0;
             
-            // Rastgele organik azalan mock tutarlar ve NFT görselleri
             let currentMockAmount = 492.35;
             while (fullList.length < 20) {
                 let template = baseTemplates[index % baseTemplates.length];
@@ -49,7 +47,6 @@ export default async function handler(req, res) {
                 index++;
             }
 
-            // En yüksek tutara göre büyükten küçüğe sıralama (Taht kralı her zaman en üstte)
             fullList.sort((a, b) => b.amount - a.amount);
 
             let formattedList = fullList.map(u => ({
@@ -64,20 +61,18 @@ export default async function handler(req, res) {
     }
 
     if (req.method === 'POST') {
-        // Telegram butonuna (Onayla / Reddet) basıldığında çalışır
         if (req.body && req.body.callback_query) {
             const callback = req.body.callback_query;
             const dataStr = callback.data;
             const callbackQueryId = callback.id;
             const messageObj = callback.message;
 
-            if (dataStr && dataStr.startsWith('confirm_')) {
+            if (dataStr && dataStr.startsWith('cf_')) {
                 try {
+                    // Telegram byte sınırını aşmamak için veriyi akıllıca parse ediyoruz
                     const parts = dataStr.split('|');
                     const name = decodeURIComponent(parts[1]);
                     const amount = parseFloat(parseFloat(parts[2]).toFixed(2));
-                    const msgText = decodeURIComponent(parts[3] || '');
-                    const nftImg = decodeURIComponent(parts[4] || '');
 
                     let getRes = await fetch(`https://api.jsonbin.io/v3/b/${BIN_ID}/latest`, {
                         headers: { 'X-Master-Key': API_KEY }
@@ -85,7 +80,14 @@ export default async function handler(req, res) {
                     let binData = await getRes.json();
                     let currentUsers = (binData && binData.record && Array.isArray(binData.record.users)) ? binData.record.users : [];
 
-                    // Yeni onaylanan flex kullanıcısını veritabanına ekle
+                    // Mesaj metninden (Telegram mesajından) gönderilen bilgileri güvenle eşleştirip buluyoruz
+                    let incomingMsg = messageObj.text || "";
+                    let msgLine = incomingMsg.split('\n').find(l => l.startsWith('💬 Mesaj:')) || "💬 Mesaj: Flex";
+                    let imgLine = incomingMsg.split('\n').find(l => l.startsWith('🖼️ NFT Görsel:')) || "🖼️ NFT Görsel: https://via.placeholder.com/150";
+
+                    let msgText = msgLine.replace('💬 Mesaj:', '').trim();
+                    let nftImg = imgLine.replace('🖼️ NFT Görsel:', '').trim();
+
                     currentUsers.push({ name, message: msgText, nftImg, amount: amount });
 
                     await fetch(`https://api.jsonbin.io/v3/b/${BIN_ID}`, {
@@ -120,7 +122,7 @@ export default async function handler(req, res) {
                 } catch (e) {
                     console.error("Onay hatası:", e);
                 }
-            } else if (dataStr && dataStr.startsWith('reject_')) {
+            } else if (dataStr && dataStr.startsWith('rj_')) {
                 try {
                     if (messageObj) {
                         await fetch(`https://api.telegram.org/bot${botToken}/answerCallbackQuery`, {
@@ -144,18 +146,18 @@ export default async function handler(req, res) {
             return res.status(200).json({ status: 'ok' });
         }
 
-        // Siteden yeni form gönderildiğinde Telegram'a bildirim atar
         if (req.body.name) {
             const { name, nftImg, message, amount, txid } = req.body;
             const text = `👑 YENİ FLEX & TAHT BAŞVURUSU!\n\n🐦 X Handle: ${name}\n🖼️ NFT Görsel: ${nftImg}\n💬 Mesaj: ${message}\n💰 Tutar: ${amount} USDT\n🔗 TxID: ${txid}`;
 
-            const callbackData = `confirm_|${encodeURIComponent(name)}|${amount}|${encodeURIComponent(message)}|${encodeURIComponent(nftImg)}`;
+            // Boyutu küçük tutarak Telegram byte sınırını koruyoruz (cf_ = confirm, rj_ = reject)
+            const callbackData = `cf_|${encodeURIComponent(name)}|${amount}`;
 
             const keyboard = {
                 inline_keyboard: [
                     [
                         { text: "✅ Onayla (Tahta Ekle)", callback_data: callbackData },
-                        { text: "❌ Reddet", callback_data: `reject_${encodeURIComponent(name)}` }
+                        { text: "❌ Reddet", callback_data: `rj_${encodeURIComponent(name)}` }
                     ]
                 ]
             };
